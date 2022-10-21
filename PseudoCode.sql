@@ -55,20 +55,35 @@ WHERE title LIKE ANY (array['A%', 'B%', 'C%', 'D%', 'E%', 'F%', 'G%', 'H%'])
 AND release_year > 2005;
 -- IF false construct on : WHERE release_year < 2005
 
--- CHECKING
-SELECT country, COUNT(*) AS n_movies
-FROM films
-WHERE title LIKE ANY (array['A%', 'B%', 'C%', 'D%', 'E%', 'F%', 'G%', 'H%'])
-AND release_year > 2005
-GROUP BY country
-ORDER BY n_movies DESC;
--- USA always have more movies than all the other countries put together
--- in all three groups of the alphabet and for both before and after 2005
-
-
--- THIRD QUESTION: country of movie being in north america (USA, Canada)
+-- Third question: divide the list in duration < or > than 100 minutes
+-- This divides more or less in half again the list of movies in all cases considered before
 SELECT *
 FROM films
 WHERE title LIKE ANY (array['A%', 'B%', 'C%', 'D%', 'E%', 'F%', 'G%', 'H%'])
 AND release_year > 2005
-AND country IN ('USA', 'Canada');
+AND duration > 100;
+-- USA always have more movies than all the other countries put together
+-- in all three groups of the alphabet and for both before and after 2005
+
+
+-- Fourth question:
+-- Trying to narrow down the first letter of the tables
+-- (array['C%', 'D%', 'E%'])
+-- (array['F%', 'G%', 'H%'])
+-- For every case we get to around 140/150 movies remaining
+SELECT *
+FROM films
+WHERE title LIKE ANY (array['A%', 'B%'])
+AND release_year > 2005
+AND duration > 100;
+
+-- Checking now on gross and budget averages, from this we can ask the next question
+SELECT AVG(gross) AS avg_gross, STDDEV_POP(gross) AS SD_gross,  AVG(budget) AS avg_budget, STDDEV_POP(budget) as SD_budget
+FROM films
+WHERE title LIKE ANY (array['A%', 'B%'])
+AND release_year > 2005
+AND duration > 100
+AND budget IS NOT NULL
+AND gross IS NOT NULL;
+
+
