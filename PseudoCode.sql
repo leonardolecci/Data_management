@@ -45,7 +45,7 @@ SELECT *
 FROM films
 WHERE title LIKE ANY (array['A%', 'B%', 'C%', 'D%', 'E%', 'F%', 'G%', 'H%']);
 
--- (array['I%', 'J%', 'K%', 'L%', 'M%', 'N%', 'O%', 'P%', 'M%', 'N%', 'O%', 'P%'])
+-- (array['I%', 'J%', 'K%', 'L%', 'M%', 'N%', 'O%', 'P%', 'Q%', 'R%', 'S%', 'I%'])
 -- (array['T%', 'U%', 'V%', 'W%', 'X%', 'Y%', 'Z%'])
 
 -- SECOND QUESTION: filter by "median" year weighted by number of movies
@@ -70,6 +70,12 @@ AND duration > 100;
 -- Trying to narrow down the first letter of the tables
 -- (array['C%', 'D%', 'E%'])
 -- (array['F%', 'G%', 'H%'])
+-- (array['I%', 'J%', 'K%', 'L%'])
+-- (array['M%', 'N%', 'O%', 'P%'])
+-- (array['Q%', 'R%', 'S%', 'I%'])
+-- (array['T%', 'U%'])
+-- (array['V%', 'W%', 'X%'])
+-- (array['Y%', 'Z%'])
 -- For every case we get to around 140/150 movies remaining
 SELECT *
 FROM films
@@ -78,12 +84,100 @@ AND release_year > 2005
 AND duration > 100;
 
 -- Checking now on gross and budget averages, from this we can ask the next question
-SELECT AVG(gross) AS avg_gross, STDDEV_POP(gross) AS SD_gross,  AVG(budget) AS avg_budget, STDDEV_POP(budget) as SD_budget
+SELECT country, certification, PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY gross) AS median_gross, AVG(gross) AS avg_gross, STDDEV(gross) AS SD_gross, PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY budget) AS median_budget, AVG(budget) AS avg_budget, STDDEV(budget) as SD_budget, COUNT(*) AS n_movies
 FROM films
 WHERE title LIKE ANY (array['A%', 'B%'])
 AND release_year > 2005
 AND duration > 100
 AND budget IS NOT NULL
-AND gross IS NOT NULL;
+AND gross IS NOT NULL
+GROUP BY country, certification
+ORDER BY n_movies DESC;
+
+SELECT country, PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY gross) AS median_gross, AVG(gross) AS avg_gross, STDDEV(gross) AS SD_gross, PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY budget) AS median_budget, AVG(budget) AS avg_budget, STDDEV(budget) as SD_budget, COUNT(*) AS n_movies
+FROM films
+WHERE title LIKE ANY (array['A%', 'B%'])
+AND release_year > 2005
+AND duration > 100
+AND budget IS NOT NULL
+AND gross IS NOT NULL
+GROUP BY country
+ORDER BY n_movies DESC;
+
+
+-- Fifth question:
+-- Once understood the median for each country and certification, and only for country
+-- we want to ask if the budget is greater/lower than the median for the country with highest number of movies left
+-- this will allow us to have a better understanding also of the country whe the movies was produced in
+-- due to the rules of the game we will ask if the movie was produced in the country with most candidates (aka USA most likely)
+
+SELECT *
+FROM films
+WHERE title LIKE ANY (array['A%', 'B%'])
+AND release_year > 2005
+AND duration > 100
+AND country = /* insert country*/;
+
+--Sixth question:
+-- Once we understand the country we can divide in half the candidate by asking if the movie has gross greater or lower than the median
+
+SELECT *
+FROM films
+WHERE title LIKE ANY (array['A%', 'B%'])
+AND release_year > 2005
+AND duration > 100
+AND country = /* insert country*/
+AND gross > /* insert median*/;
+
+-- Run a check of what's left grouping by certification
+SELECT certification, COUNT(*) AS n_left
+FROM films
+WHERE title LIKE ANY (array['A%', 'B%'])
+AND release_year > 2005
+AND duration > 100
+AND country = 'USA'
+AND gross > 25000000
+GROUP BY certification;
+
+-- Sixth question:
+-- Trying to filter by asking if the movie is contained in the most frequent observation of the attribute certification
+
+SELECT *
+FROM films
+WHERE title LIKE ANY (array['A%', 'B%'])
+AND release_year > 2005
+AND duration > 100
+AND country = 'USA'
+AND gross > 25000000
+AND certification ='R';
+
+-- Seventh question:
+-- filter per budget so first run a check on the descriptive statistics
+
+SELECT PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY gross) AS median_gross, AVG(gross) AS avg_gross, STDDEV(gross) AS SD_gross, PERCENTILE_CONT(0.5) WITHIN GROUP(ORDER BY budget) AS median_budget, AVG(budget) AS avg_budget, STDDEV(budget) as SD_budget, COUNT(*) AS n_movies
+FROM films
+WHERE title LIKE ANY (array['A%', 'B%'])
+AND release_year > 2005
+AND duration > 100
+AND budget IS NOT NULL
+AND gross IS NOT NULL
+AND country = 'USA'
+AND gross > 25000000
+AND certification ='R'
+ORDER BY n_movies DESC;
+
+-- Now the question:
+
+SELECT *
+FROM films
+WHERE title LIKE ANY (array['A%', 'B%'])
+AND release_year > 2005
+AND duration > 100
+AND country = /* insert country*/
+AND gross > /* insert median*/
+AND certification =/* insert most frequent certfication*/
+AND budget > /* insert median*/;
+
+-- From here we can ask specific question about the title as well
 
 
