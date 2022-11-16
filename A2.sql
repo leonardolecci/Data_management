@@ -128,18 +128,19 @@ BEGIN
                        AND je.company_id = 1);
 
 
-    SELECT IFNULL(revenue, 0),
-           IFNULL(ret_ref_disc, 0),
-           IFNULL(cogs, 0),
-           IFNULL(adm_exp, 0),
-           IFNULL(sell_exp, 0),
-           IFNULL(other_exp, 0),
-           IFNULL(other_inc, 0),
-           IFNULL(income_tax, 0),
-           IFNULL(other_tax, 0),
-           (IFNULL(revenue, 0) - IFNULL(ret_ref_disc, 0) - IFNULL(cogs, 0) - IFNULL(adm_exp, 0) - IFNULL(sell_exp, 0) -
-            IFNULL(other_exp, 0)
-               - IFNULL(other_inc, 0) - IFNULL(income_tax, 0) - IFNULL(other_tax, 0)) AS Net_Profit_Loss;
+    SELECT CONCAT('$', FORMAT(IFNULL(revenue, 0), 2)) AS REVENUE,
+           CONCAT('$', FORMAT(IFNULL(ret_ref_disc, 0), 2)) AS RETURNS_REFUNDS_DISCOUNTS,
+           CONCAT('$', FORMAT(IFNULL(cogs, 0), 2)) AS COGS,
+           CONCAT('$', FORMAT(IFNULL(adm_exp, 0), 2)) AS ADMINISTRATIVE_EXPENSES,
+           CONCAT('$', FORMAT(IFNULL(sell_exp, 0), 2)) AS SELLING_EXPENSES,
+           CONCAT('$', FORMAT(IFNULL(other_exp, 0), 2)) AS OTHER_EXPENSES,
+           CONCAT('$', FORMAT(IFNULL(other_inc, 0), 2)) AS OTHER_INCOME,
+           CONCAT('$', FORMAT(IFNULL(income_tax, 0), 2)) AS INCOME_TAX,
+           CONCAT('$', FORMAT(IFNULL(other_tax, 0), 2)) AS OTHER_TAX,
+           CONCAT('$', FORMAT((IFNULL(revenue, 0) - IFNULL(ret_ref_disc, 0) - IFNULL(cogs, 0) - IFNULL(adm_exp, 0) -
+                               IFNULL(sell_exp, 0)
+               - IFNULL(other_exp, 0) - IFNULL(other_inc, 0) - IFNULL(income_tax, 0) -
+                               IFNULL(other_tax, 0)), 2)) AS Net_Profit_Loss;
 
 
 END $$
