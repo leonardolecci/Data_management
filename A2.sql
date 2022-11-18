@@ -1,148 +1,106 @@
 USE H_Accounting;
 
 DELIMITER $$
+-- STORED PROCEDURE FOR CALCULATING BALANCE SHEET
 
-DROP PROCEDURE if EXISTS LL_PL_Statement;
+DROP PROCEDURE if EXISTS LL_BS_Statement;
 
-CREATE PROCEDURE LL_PL_Statement(varCalendarYear SMALLINT)
+CREATE PROCEDURE LL_BS_Statement(varCalendarYear INT)
 BEGIN
 
     -- Declaring variables where I'll store my PL accounts
-    DECLARE revenue FLOAT;
-    DECLARE ret_ref_disc FLOAT;
-    DECLARE cogs FLOAT;
-    DECLARE adm_exp FLOAT;
-    DECLARE sell_exp FLOAT;
-    DECLARE other_exp FLOAT;
-    DECLARE other_inc FLOAT;
-    DECLARE income_tax FLOAT;
-    DECLARE other_tax FLOAT;
 
--- CALCULATE revenue
-    SET revenue = (SELECT SUM(jeli.credit) AS revenue
-                   FROM account
-                            INNER JOIN journal_entry_line_item AS jeli
-                                       ON account.account_id = jeli.account_id
-                            INNER JOIN journal_entry AS je
-                                       ON jeli.journal_entry_id = je.journal_entry_id
-                   WHERE profit_loss_section_id = 68
-                     AND YEAR(je.entry_date) = varCalendarYear
-                     AND je.company_id = 1);
+    DECLARE i INT;
+    DECLARE statement_section VARCHAR(35);
+    DECLARE a FLOAT;
+    DECLARE b FLOAT;
 
 
--- CALCULATE RETURNS, REFUNDS, DISCOUNTS
+    -- setting year
 
-    SET ret_ref_disc = (SELECT SUM(jeli.credit) AS ret_ref_disc
-                        FROM account
-                                 INNER JOIN journal_entry_line_item AS jeli
-                                            ON account.account_id = jeli.account_id
-                                 INNER JOIN journal_entry AS je
-                                            ON jeli.journal_entry_id = je.journal_entry_id
-                        WHERE profit_loss_section_id = 69
-                          AND YEAR(je.entry_date) = varCalendarYear
-                          AND je.company_id = 1);
+    SET @year = varCalendarYear;
+    SET @prev_year = varCalendarYear - 1;
 
--- CALCULATE COST OF GOOD SOLD
+    -- setting company id to 1
 
-    SET cogs = (SELECT SUM(jeli.credit) AS cogs
-                FROM account
-                         INNER JOIN journal_entry_line_item AS jeli
-                                    ON account.account_id = jeli.account_id
-                         INNER JOIN journal_entry AS je
-                                    ON jeli.journal_entry_id = je.journal_entry_id
-                WHERE profit_loss_section_id = 74
-                  AND YEAR(je.entry_date) = varCalendarYear
-                  AND je.company_id = 1);
+    SET @comp_id = 1;
 
--- CALCULATE ADMINISTRATIVE EXPENSES
+    -- dummy var saying if we are getting values for BS (1), or PL (0)
 
-    SET adm_exp = (SELECT SUM(jeli.credit) AS adm_exp
-                   FROM account
-                            INNER JOIN journal_entry_line_item AS jeli
-                                       ON account.account_id = jeli.account_id
-                            INNER JOIN journal_entry AS je
-                                       ON jeli.journal_entry_id = je.journal_entry_id
-                   WHERE profit_loss_section_id = 75
-                     AND YEAR(je.entry_date) = varCalendarYear
-                     AND je.company_id = 1);
+    SET @PL_BS = 0;
 
--- CALCULATE SELLING EXPENSES
+    -- t is the counter to offset the returned statement section id in the WHERE subquery
+    SET @t = 0;
 
-    SET sell_exp = (SELECT SUM(jeli.credit) AS sell_exp
-                    FROM account
-                             INNER JOIN journal_entry_line_item AS jeli
-                                        ON account.account_id = jeli.account_id
-                             INNER JOIN journal_entry AS je
-                                        ON jeli.journal_entry_id = je.journal_entry_id
-                    WHERE profit_loss_section_id = 76
-                      AND YEAR(je.entry_date) = varCalendarYear
-                      AND je.company_id = 1);
+    -- i si the counter fot he while loop
+    SET i = -(SELECT COUNT(*)
+              FROM statement_section
+              WHERE company_id = 1
+                AND is_balance_sheet_section = 0);
 
--- CALCULATE OTHER EXPENSES
+    DROP TABLE if EXISTS final_statements;
+    CREATE TABLE final_statements
+    (
+        Account           VARCHAR(35),
+        Current_Year      VARCHAR(25),
+        Past_Year         VARCHAR(25),
+        Percentage_Change VARCHAR(25)
+    );
 
-    SET other_exp = (SELECT SUM(jeli.credit) AS other_exp
-                     FROM account
-                              INNER JOIN journal_entry_line_item AS jeli
-                                         ON account.account_id = jeli.account_id
-                              INNER JOIN journal_entry AS je
-                                         ON jeli.journal_entry_id = je.journal_entry_id
-                     WHERE profit_loss_section_id = 77
-                       AND YEAR(je.entry_date) = varCalendarYear
-                       AND je.company_id = 1);
+    -- trying something
+    WHILE i < 0
+        DO
+            -- getting the field to put in the table
+            SET @sql =
+                    'SELECT @field := statement_section FROM statement_section WHERE is_balance_sheet_section = ? AND company_id = ? LIMIT ?, 1';
+            PREPARE stmt FROM @sql;
+            EXECUTE stmt USING @PL_BS, @comp_id, @t;
 
--- CALCULATE OTHER INCOME
+            -- querying for the year specified
 
-    SET other_inc = (SELECT SUM(jeli.credit) AS other_inc
-                     FROM account
-                              INNER JOIN journal_entry_line_item AS jeli
-                                         ON account.account_id = jeli.account_id
-                              INNER JOIN journal_entry AS je
-                                         ON jeli.journal_entry_id = je.journal_entry_id
-                     WHERE profit_loss_section_id = 78
-                       AND YEAR(je.entry_date) = varCalendarYear
-                       AND je.company_id = 1);
+            SET @SQL = 'SELECT @amount := IFNULL(SUM(jeli.credit), 0)
+                           FROM account
+                                    INNER JOIN journal_entry_line_item AS jeli
+                                               ON account.account_id = jeli.account_id
+                                    INNER JOIN journal_entry AS je
+                                               ON jeli.journal_entry_id = je.journal_entry_id
+                           WHERE profit_loss_section_id = (SELECT statement_section_id FROM statement_section WHERE is_balance_sheet_section = ? AND company_id = ? LIMIT ?, 1)
+                             AND YEAR(je.entry_date) = ?
+                             AND je.company_id = ?';
+            PREPARE stmt FROM @sql;
+            EXECUTE stmt USING @PL_BS, @comp_id, @t, @Year, @comp_id;
+            DEALLOCATE PREPARE stmt;
 
--- CALCULATE INCOME TAX
+            -- querying for year previous to specified
 
-    SET income_tax = (SELECT SUM(jeli.credit) AS income_tax
-                      FROM account
-                               INNER JOIN journal_entry_line_item AS jeli
-                                          ON account.account_id = jeli.account_id
-                               INNER JOIN journal_entry AS je
-                                          ON jeli.journal_entry_id = je.journal_entry_id
-                      WHERE profit_loss_section_id = 79
-                        AND YEAR(je.entry_date) = varCalendarYear
-                        AND je.company_id = 1);
+            SET @SQL = 'SELECT @amount_prev_year := IFNULL(SUM(jeli.credit), 0)
+                           FROM account
+                                    INNER JOIN journal_entry_line_item AS jeli
+                                               ON account.account_id = jeli.account_id
+                                    INNER JOIN journal_entry AS je
+                                               ON jeli.journal_entry_id = je.journal_entry_id
+                           WHERE profit_loss_section_id = (SELECT statement_section_id FROM statement_section WHERE is_balance_sheet_section = ? AND company_id = ? LIMIT ?, 1)
+                             AND YEAR(je.entry_date) = ?
+                             AND je.company_id = ?';
+            PREPARE stmt FROM @sql;
+            EXECUTE stmt USING @PL_BS, @comp_id, @t, @prev_year, @comp_id;
+            DEALLOCATE PREPARE stmt;
 
+             SET a = CAST(@amount AS DECIMAL(65,2));
+             SET b = CAST(@amount_prev_year AS DECIMAL(65,2));
 
--- CALCULATE OTHER TAX
+            SET @perc_change = CONCAT(FORMAT(IFNULL(((a - b) / b) * 100, 0),2), '%');
 
-    SET other_tax = (SELECT SUM(jeli.credit) AS other_tax
-                     FROM account
-                              INNER JOIN journal_entry_line_item AS jeli
-                                         ON account.account_id = jeli.account_id
-                              INNER JOIN journal_entry AS je
-                                         ON jeli.journal_entry_id = je.journal_entry_id
-                     WHERE profit_loss_section_id = 80
-                       AND YEAR(je.entry_date) = varCalendarYear
-                       AND je.company_id = 1);
+            INSERT INTO final_statements VALUES (@field, FORMAT(@amount, 2), FORMAT(@amount_prev_year, 2), @perc_change);
+            SET @t = @t + 1;
+            SET i = i + 1;
+        END WHILE;
 
-
-    SELECT CONCAT('$', FORMAT(IFNULL(revenue, 0), 2)) AS REVENUE,
-           CONCAT('$', FORMAT(IFNULL(ret_ref_disc, 0), 2)) AS RETURNS_REFUNDS_DISCOUNTS,
-           CONCAT('$', FORMAT(IFNULL(cogs, 0), 2)) AS COGS,
-           CONCAT('$', FORMAT(IFNULL(adm_exp, 0), 2)) AS ADMINISTRATIVE_EXPENSES,
-           CONCAT('$', FORMAT(IFNULL(sell_exp, 0), 2)) AS SELLING_EXPENSES,
-           CONCAT('$', FORMAT(IFNULL(other_exp, 0), 2)) AS OTHER_EXPENSES,
-           CONCAT('$', FORMAT(IFNULL(other_inc, 0), 2)) AS OTHER_INCOME,
-           CONCAT('$', FORMAT(IFNULL(income_tax, 0), 2)) AS INCOME_TAX,
-           CONCAT('$', FORMAT(IFNULL(other_tax, 0), 2)) AS OTHER_TAX,
-           CONCAT('$', FORMAT((IFNULL(revenue, 0) - IFNULL(ret_ref_disc, 0) - IFNULL(cogs, 0) - IFNULL(adm_exp, 0) -
-                               IFNULL(sell_exp, 0)
-               - IFNULL(other_exp, 0) - IFNULL(other_inc, 0) - IFNULL(income_tax, 0) -
-                               IFNULL(other_tax, 0)), 2)) AS Net_Profit_Loss;
-
-
+    SELECT *
+    FROM final_statements;
 END $$
 
-CALL LL_PL_Statement(2017);
+
+CALL LL_BS_Statement(2017);
+
+
