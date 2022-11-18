@@ -87,7 +87,7 @@ BEGIN
     SET b = CAST(@trr AS DECIMAL(65, 2));
     SET @perc_change = CONCAT(FORMAT(IFNULL(((a - b) / b) * 100, 0), 2), '%');
     INSERT INTO final_PL_statements
-    VALUES ('Net Profit/Loss', CONCAT('', a), CONCAT('', b), @perc_change);
+    VALUES ('NET PROFIT/LOSS', CONCAT('', a), CONCAT('', b), @perc_change);
     -- printing the final resulting table
     SELECT *
     FROM final_PL_statements;
