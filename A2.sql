@@ -6,12 +6,13 @@ DELIMITER $$
 DROP PROCEDURE if EXISTS LL_PL_Statement;
 CREATE PROCEDURE LL_PL_Statement(varCalendarYear INT)
 BEGIN
-    -- Declaring variables where I'll store my PL accounts
+    -- declaring variables
     DECLARE i INT;
     DECLARE statement_section VARCHAR(35);
+    -- a,b will be used to calculate the percentage change
     DECLARE a DOUBLE;
     DECLARE b DOUBLE;
-    -- setting year
+    -- setting year in a global variable to be used in prepared statement SQL
     SET @year = varCalendarYear;
     SET @prev_year = varCalendarYear - 1;
     -- setting company id to 1
@@ -26,8 +27,8 @@ BEGIN
               WHERE company_id = 1
                 AND is_balance_sheet_section = 0);
     -- creating table to store the final PL statements with percentage changes
-    DROP TABLE if EXISTS final_statements;
-    CREATE TABLE final_statements
+    DROP TABLE if EXISTS final_PL_statements;
+    CREATE TABLE final_PL_statements
     (
         Account           VARCHAR(35),
         Current_Year      VARCHAR(25),
@@ -74,39 +75,41 @@ BEGIN
             SET b = CAST(@amount_prev_year AS DECIMAL(65, 2));
             SET @perc_change = CONCAT(FORMAT(IFNULL(((a - b) / b) * 100, 0), 2), '%');
             -- insert data into table
-            INSERT INTO final_statements
+            INSERT INTO final_PL_statements
             VALUES (@field, ROUND(@amount, 2), ROUND(@amount_prev_year, 2), @perc_change);
             SET @t = @t + 1;
             SET i = i + 1;
         END WHILE;
-    SET @tr = (SELECT SUM(CAST(Current_Year AS DECIMAL(65, 2))) FROM final_statements);
-    SET @trr = (SELECT SUM(Past_Year) FROM final_statements);
+    -- calculating Net Profit(loss) and its percentage change and putting it into the table
+    SET @tr = (SELECT SUM(CAST(Current_Year AS DECIMAL(65, 2))) FROM final_PL_statements);
+    SET @trr = (SELECT SUM(Past_Year) FROM final_PL_statements);
     SET a = CAST(@tr AS DECIMAL(65, 2));
     SET b = CAST(@trr AS DECIMAL(65, 2));
     SET @perc_change = CONCAT(FORMAT(IFNULL(((a - b) / b) * 100, 0), 2), '%');
-    INSERT INTO final_statements
+    INSERT INTO final_PL_statements
     VALUES ('Net Profit/Loss', CONCAT('', a), CONCAT('', b), @perc_change);
-
+    -- printing the final resulting table
     SELECT *
-    FROM final_statements;
+    FROM final_PL_statements;
 END $$
 
 -- CALL LL_PL_Statement(2017);
 
 
--- create procedure for calculating the balance sheet
+-- CREATING PROCEDURE FOR THE BALANCE SHEET
 
 
 DELIMITER $$
 DROP PROCEDURE if EXISTS LL_BS_Statement;
 CREATE PROCEDURE LL_BS_Statement(varCalendarYear INT)
 BEGIN
-    -- Declaring variables where I'll store my PL accounts
+    -- Declaring variables
     DECLARE i INT;
     DECLARE statement_section VARCHAR(35);
+    -- a,b will be used for calculating the percentage change
     DECLARE a DOUBLE;
     DECLARE b DOUBLE;
-    -- setting year
+    -- setting year as a global variable to be used in the prepared statements SQL
     SET @year = varCalendarYear;
     SET @prev_year = varCalendarYear - 1;
     -- setting company id to 1
@@ -120,7 +123,7 @@ BEGIN
               FROM statement_section
               WHERE company_id = 1
                 AND is_balance_sheet_section = 1);
-    -- creating table to store the final PL statements with percentage changes
+    -- creating table to store the final BS statement with percentage changes
     DROP TABLE if EXISTS final_BS_statements;
     CREATE TABLE final_BS_statements
     (
@@ -129,8 +132,8 @@ BEGIN
         Past_Year         VARCHAR(25),
         Percentage_Change VARCHAR(25)
     );
-    -- while loop to get all the accounts of the PL statements for the specified and its previous year
-    -- calculate the percentage change and storing all in the table final_statements
+    -- while loop to get all the accounts of the BS statements for the specified and its previous year
+    -- calculate the percentage change and storing all in the table final_BS_statements
     WHILE i < 0
         DO
             -- getting the field to put in the table
@@ -138,8 +141,9 @@ BEGIN
                     'SET @field = (SELECT statement_section FROM statement_section WHERE is_balance_sheet_section = ? AND company_id = ? LIMIT ?, 1)';
             PREPARE stmt FROM @sql;
             EXECUTE stmt USING @BS, @comp_id, @t;
-
+            -- IF statement to see if it is an asset or liabilities/equity to be calculated
             IF @field LIKE ('%ASSETS%') THEN
+                -- assets --> debit - credit
                 SET @SQL = 'SET @amount = (SELECT IFNULL((SUM(jeli.debit) - SUM(jeli.credit)), 0)
                            FROM account
                                     INNER JOIN journal_entry_line_item AS jeli
@@ -167,6 +171,7 @@ BEGIN
                 DEALLOCATE PREPARE stmt;
 
             ELSE
+                -- Liability/equity --> credit - debit
                 SET @SQL = 'SET @amount = (SELECT IFNULL((SUM(jeli.credit) - SUM(jeli.debit)), 0)
                            FROM account
                                     INNER JOIN journal_entry_line_item AS jeli
