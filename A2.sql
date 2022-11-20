@@ -31,9 +31,9 @@ BEGIN
     CREATE TABLE final_PL_statements
     (
         Account           VARCHAR(35),
-        Current_Year      VARCHAR(25),
-        Past_Year         VARCHAR(25),
-        Percentage_Change VARCHAR(25)
+        Current_Year      DOUBLE,
+        Past_Year         DOUBLE,
+        Percentage_Change VARCHAR(35)
     );
     -- while loop to get all the accounts of the PL statements for the specified and its previous year
     -- calculate the percentage change and storing all in the table final_statements
@@ -70,30 +70,36 @@ BEGIN
             PREPARE stmt FROM @sql;
             EXECUTE stmt USING @PL_BS, @comp_id, @t, @prev_year, @comp_id;
             DEALLOCATE PREPARE stmt;
-            -- converting global var into FLOAT var
-            SET a = CAST(@amount AS DECIMAL(65, 2));
-            SET b = CAST(@amount_prev_year AS DECIMAL(65, 2));
-            SET @perc_change = CONCAT(FORMAT(IFNULL(((a - b) / b) * 100, 0), 2), '%');
+            -- calculating percentage change
+            SET @percentage_change = CONCAT(FORMAT(IFNULL(((@amount - @amount_prev_year) / @amount_prev_year) * 100, 0), 2), '%');
             -- insert data into table
             INSERT INTO final_PL_statements
-            VALUES (@field, ROUND(@amount, 2), ROUND(@amount_prev_year, 2), @perc_change);
+            VALUES (@field, ROUND(@amount, 2), ROUND(@amount_prev_year, 2), @percentage_change);
             SET @t = @t + 1;
             SET i = i + 1;
         END WHILE;
     -- calculating Net Profit(loss) and its percentage change and putting it into the table
-    SET @tr = (SELECT SUM(CAST(Current_Year AS DECIMAL(65, 2))) FROM final_PL_statements);
-    SET @trr = (SELECT SUM(Past_Year) FROM final_PL_statements);
-    SET a = CAST(@tr AS DECIMAL(65, 2));
-    SET b = CAST(@trr AS DECIMAL(65, 2));
-    SET @perc_change = CONCAT(FORMAT(IFNULL(((a - b) / b) * 100, 0), 2), '%');
+
+
+    SET a = (SELECT (SELECT Current_Year FROM final_PL_statements LIMIT 1) - SUM(IFNULL(Current_Year,0))
+               FROM final_PL_statements WHERE Account != 'NET PROFIT/LOSS' AND Account != 'REVENUE');
+
+    SET b = (SELECT (SELECT Past_Year FROM final_PL_statements LIMIT 1) - SUM(IFNULL(Past_Year,0))
+                FROM final_PL_statements WHERE Account != 'NET PROFIT/LOSS' AND Account != 'REVENUE');
+    SET @percentage_change = CONCAT(FORMAT(IFNULL(((a - b) / b) * 100, 0), 2), '%');
     INSERT INTO final_PL_statements
-    VALUES ('NET PROFIT/LOSS', CONCAT('', a), CONCAT('', b), @perc_change);
+    VALUES ('NET PROFIT/LOSS', ROUND(a,2), ROUND(b,2), @percentage_change);
+    -- CAST(Current_Year AS DECIMAL(65, 2))
+    -- CAST(Past_Year AS DECIMAL(65, 2))
+    /*UPDATE final_PL_statements
+    SET Current_Year = CONCAT('$', FORMAT(Current_Year, 2))
+        AND Past_Year = CONCAT('$', FORMAT(Past_Year, 2));*/
     -- printing the final resulting table
     SELECT *
     FROM final_PL_statements;
 END $$
 
--- CALL LL_PL_Statement(2017);
+ CALL LL_PL_Statement(2017);
 
 
 -- CREATING PROCEDURE FOR THE BALANCE SHEET
@@ -128,8 +134,8 @@ BEGIN
     CREATE TABLE final_BS_statements
     (
         Account           VARCHAR(35),
-        Current_Year      VARCHAR(25),
-        Past_Year         VARCHAR(25),
+        Current_Year      DOUBLE,
+        Past_Year         DOUBLE,
         Percentage_Change VARCHAR(25)
     );
     -- while loop to get all the accounts of the BS statements for the specified and its previous year
@@ -199,10 +205,8 @@ BEGIN
                 DEALLOCATE PREPARE stmt;
 
             END IF;
-            -- converting global var into FLOAT var
-            SET a = CAST(@amount AS DECIMAL(65, 2));
-            SET b = CAST(@amount_prev_year AS DECIMAL(65, 2));
-            SET @perc_change = CONCAT(FORMAT(IFNULL(((a - b) / b) * 100, 0), 2), '%');
+            -- calculating percentage change
+            SET @perc_change = CONCAT(FORMAT(IFNULL(((@amount - @amount_prev_year) / @amount_prev_year) * 100, 0), 2), '%');
             -- insert data into table
             INSERT INTO final_BS_statements
             VALUES (@field, ROUND(@amount, 2), ROUND(@amount_prev_year, 2), @perc_change);
@@ -216,7 +220,5 @@ BEGIN
 END $$
 
 
-CALL LL_BS_Statement(2014);
+CALL LL_BS_Statement(2015);
 CALL LL_PL_Statement(2017);
-
-
