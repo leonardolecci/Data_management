@@ -7,11 +7,11 @@ DROP PROCEDURE if EXISTS LL_PL_Statement;
 CREATE PROCEDURE LL_PL_Statement(varCalendarYear INT)
 BEGIN
     -- declaring variables
-    DECLARE i INT;
+    DECLARE i INT DEFAULT 0;
     DECLARE statement_section VARCHAR(35);
     -- a,b will be used to calculate the percentage change
-    DECLARE a DOUBLE;
-    DECLARE b DOUBLE;
+    DECLARE a DOUBLE DEFAULT 0;
+    DECLARE b DOUBLE DEFAULT 0;
     -- setting year in a global variable to be used in prepared statement SQL
     SET @year = varCalendarYear;
     SET @prev_year = varCalendarYear - 1;
@@ -107,12 +107,12 @@ DROP PROCEDURE if EXISTS LL_BS_Statement;
 CREATE PROCEDURE LL_BS_Statement(varCalendarYear INT)
 BEGIN
     -- Declaring variables
-    DECLARE i INT;
+    DECLARE i INT DEFAULT 0;
     DECLARE statement_section VARCHAR(35);
-    DECLARE total_asset_cy DOUBLE;
-    DECLARE total_liabilities_equity_cy DOUBLE;
-    DECLARE total_asset_py DOUBLE;
-    DECLARE total_liabilities_equity_py DOUBLE;
+    DECLARE total_asset_cy DOUBLE DEFAULT 0;
+    DECLARE total_liabilities_equity_cy DOUBLE DEFAULT 0;
+    DECLARE total_asset_py DOUBLE DEFAULT 0;
+    DECLARE total_liabilities_equity_py DOUBLE DEFAULT 0;
     -- setting year as a global variable to be used in the prepared statements SQL
     SET @year = varCalendarYear;
     SET @prev_year = varCalendarYear - 1;
@@ -156,7 +156,8 @@ BEGIN
                                                ON jeli.journal_entry_id = je.journal_entry_id
                            WHERE balance_sheet_section_id = (SELECT statement_section_id FROM statement_section WHERE is_balance_sheet_section = ? AND company_id = ? LIMIT ?, 1)
                              AND YEAR(je.entry_date) = ?
-                             AND je.company_id = ?)';
+                             AND je.company_id = ?
+                             AND cancelled = 0)';
                 PREPARE stmt FROM @sql;
                 EXECUTE stmt USING @BS, @comp_id, @t, @Year, @comp_id;
                 DEALLOCATE PREPARE stmt;
@@ -169,7 +170,8 @@ BEGIN
                                                ON jeli.journal_entry_id = je.journal_entry_id
                            WHERE balance_sheet_section_id = (SELECT statement_section_id FROM statement_section WHERE is_balance_sheet_section = ? AND company_id = ? LIMIT ?, 1)
                              AND YEAR(je.entry_date) = ?
-                             AND je.company_id = ?)';
+                             AND je.company_id = ?
+                             AND cancelled = 0)';
                 PREPARE stmt FROM @sql;
                 EXECUTE stmt USING @BS, @comp_id, @t, @prev_year, @comp_id;
                 DEALLOCATE PREPARE stmt;
@@ -184,7 +186,8 @@ BEGIN
                                                ON jeli.journal_entry_id = je.journal_entry_id
                            WHERE balance_sheet_section_id = (SELECT statement_section_id FROM statement_section WHERE is_balance_sheet_section = ? AND company_id = ? LIMIT ?, 1)
                              AND YEAR(je.entry_date) = ?
-                             AND je.company_id = ?)';
+                             AND je.company_id = ?
+                             AND cancelled = 0)';
                 PREPARE stmt FROM @sql;
                 EXECUTE stmt USING @BS, @comp_id, @t, @Year, @comp_id;
                 DEALLOCATE PREPARE stmt;
@@ -197,7 +200,8 @@ BEGIN
                                                ON jeli.journal_entry_id = je.journal_entry_id
                            WHERE balance_sheet_section_id = (SELECT statement_section_id FROM statement_section WHERE is_balance_sheet_section = ? AND company_id = ? LIMIT ?, 1)
                              AND YEAR(je.entry_date) = ?
-                             AND je.company_id = ?)';
+                             AND je.company_id = ?
+                             AND cancelled = 0)';
                 PREPARE stmt FROM @sql;
                 EXECUTE stmt USING @BS, @comp_id, @t, @prev_year, @comp_id;
                 DEALLOCATE PREPARE stmt;
@@ -235,11 +239,5 @@ BEGIN
     FROM final_BS_statements;
 END $$
 
-
-
-
-
-
-
-CALL LL_BS_Statement(2015);
+CALL LL_BS_Statement(2017);
 CALL LL_PL_Statement(2017);
