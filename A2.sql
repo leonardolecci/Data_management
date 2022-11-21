@@ -19,7 +19,7 @@ BEGIN
     SET @comp_id = 1;
     -- dummy var saying if we are getting values for BS (1), or PL (0)
     SET @PL_BS = 0;
-    -- t is the counter to offset the returned statement section id in the WHERE subquery
+    -- t is the counter to offset the returned statement section id in the WHERE sub-query
     SET @t = 0;
     -- i si the counter fot he while loop
     SET i = -(SELECT COUNT(*)
@@ -71,7 +71,8 @@ BEGIN
             EXECUTE stmt USING @PL_BS, @comp_id, @t, @prev_year, @comp_id;
             DEALLOCATE PREPARE stmt;
             -- calculating percentage change
-            SET @percentage_change = CONCAT(FORMAT(IFNULL(((@amount - @amount_prev_year) / @amount_prev_year) * 100, 0), 2), '%');
+            SET @percentage_change =
+                    CONCAT(FORMAT(IFNULL(((@amount - @amount_prev_year) / @amount_prev_year) * 100, 0), 2), '%');
             -- insert data into table
             INSERT INTO final_PL_statements
             VALUES (@field, ROUND(@amount, 2), ROUND(@amount_prev_year, 2), @percentage_change);
@@ -81,14 +82,18 @@ BEGIN
     -- calculating Net Profit(loss) and its percentage change and putting it into the table
 
 
-    SET a = (SELECT (SELECT Current_Year FROM final_PL_statements LIMIT 1) - SUM(IFNULL(Current_Year,0))
-               FROM final_PL_statements WHERE Account != 'NET PROFIT/LOSS' AND Account != 'REVENUE');
+    SET a = (SELECT (SELECT Current_Year FROM final_PL_statements LIMIT 1) - SUM(IFNULL(Current_Year, 0))
+             FROM final_PL_statements
+             WHERE Account != 'NET PROFIT/LOSS'
+               AND Account != 'REVENUE');
 
-    SET b = (SELECT (SELECT Past_Year FROM final_PL_statements LIMIT 1) - SUM(IFNULL(Past_Year,0))
-                FROM final_PL_statements WHERE Account != 'NET PROFIT/LOSS' AND Account != 'REVENUE');
+    SET b = (SELECT (SELECT Past_Year FROM final_PL_statements LIMIT 1) - SUM(IFNULL(Past_Year, 0))
+             FROM final_PL_statements
+             WHERE Account != 'NET PROFIT/LOSS'
+               AND Account != 'REVENUE');
     SET @percentage_change = CONCAT(FORMAT(IFNULL(((a - b) / b) * 100, 0), 2), '%');
     INSERT INTO final_PL_statements
-    VALUES ('NET PROFIT/LOSS', ROUND(a,2), ROUND(b,2), @percentage_change);
+    VALUES ('NET PROFIT/LOSS', ROUND(a, 2), ROUND(b, 2), @percentage_change);
     -- CAST(Current_Year AS DECIMAL(65, 2))
     -- CAST(Past_Year AS DECIMAL(65, 2))
     /*UPDATE final_PL_statements
@@ -98,8 +103,6 @@ BEGIN
     SELECT *
     FROM final_PL_statements;
 END $$
-
- CALL LL_PL_Statement(2017);
 
 
 -- CREATING PROCEDURE FOR THE BALANCE SHEET
@@ -112,9 +115,10 @@ BEGIN
     -- Declaring variables
     DECLARE i INT;
     DECLARE statement_section VARCHAR(35);
-    -- a,b will be used for calculating the percentage change
-    DECLARE a DOUBLE;
-    DECLARE b DOUBLE;
+    DECLARE total_asset_cy DOUBLE;
+    DECLARE total_liabilities_equity_cy DOUBLE;
+    DECLARE total_asset_py DOUBLE;
+    DECLARE total_liabilities_equity_py DOUBLE;
     -- setting year as a global variable to be used in the prepared statements SQL
     SET @year = varCalendarYear;
     SET @prev_year = varCalendarYear - 1;
@@ -206,16 +210,34 @@ BEGIN
 
             END IF;
             -- calculating percentage change
-            SET @perc_change = CONCAT(FORMAT(IFNULL(((@amount - @amount_prev_year) / @amount_prev_year) * 100, 0), 2), '%');
+            SET @percentage_change =
+                    CONCAT(FORMAT(IFNULL(((@amount - @amount_prev_year) / @amount_prev_year) * 100, 0), 2), '%');
             -- insert data into table
             INSERT INTO final_BS_statements
-            VALUES (@field, ROUND(@amount, 2), ROUND(@amount_prev_year, 2), @perc_change);
+            VALUES (@field, ROUND(@amount, 2), ROUND(@amount_prev_year, 2), @percentage_change);
             SET @t = @t + 1;
             SET i = i + 1;
         END WHILE;
-
-
-    SELECT *
+    -- calculating variable for TA, TLE for year specified
+    SET total_asset_cy = (SELECT SUM(current_year) FROM final_BS_statements WHERE Account LIKE '%ASSETS%');
+    SET total_asset_py = (SELECT SUM(past_year) FROM final_BS_statements WHERE Account LIKE '%ASSETS%');
+    -- calculating percentage change for total assets
+    SET @percentage_change =
+            CONCAT(FORMAT(IFNULL(((total_asset_cy - total_asset_py) / total_asset_py) * 100, 0), 2), '%');
+    INSERT INTO final_BS_statements
+    VALUES ('TOTAL ASSETS', ROUND(total_asset_cy, 2), ROUND(total_asset_py, 2), @percentage_change);
+    -- calculating variable for TA, TLE for previous year
+    SET total_liabilities_equity_cy =
+            (SELECT SUM(current_year) FROM final_BS_statements WHERE Account NOT LIKE '%ASSETS%');
+    SET total_liabilities_equity_py =
+            (SELECT SUM(past_year) FROM final_BS_statements WHERE Account NOT LIKE '%ASSETS%');
+    -- calculating percentage change for total liabilities and equity
+    SET @percentage_change = CONCAT(FORMAT(IFNULL(((total_liabilities_equity_cy - total_liabilities_equity_py) /
+                                                   total_liabilities_equity_py) * 100, 0), 2), '%');
+    INSERT INTO final_BS_statements
+    VALUES ('TOTAL LIABILITIES AND EQUITY', ROUND(total_liabilities_equity_cy, 2),
+            ROUND(total_liabilities_equity_py, 2), @percentage_change);
+    SELECT Account, FORMAT(Current_Year, 2), FORMAT(Past_Year, 2), Percentage_Change
     FROM final_BS_statements;
 END $$
 
