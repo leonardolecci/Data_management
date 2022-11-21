@@ -94,13 +94,7 @@ BEGIN
     SET @percentage_change = CONCAT(FORMAT(IFNULL(((a - b) / b) * 100, 0), 2), '%');
     INSERT INTO final_PL_statements
     VALUES ('NET PROFIT/LOSS', ROUND(a, 2), ROUND(b, 2), @percentage_change);
-    -- CAST(Current_Year AS DECIMAL(65, 2))
-    -- CAST(Past_Year AS DECIMAL(65, 2))
-    /*UPDATE final_PL_statements
-    SET Current_Year = CONCAT('$', FORMAT(Current_Year, 2))
-        AND Past_Year = CONCAT('$', FORMAT(Past_Year, 2));*/
-    -- printing the final resulting table
-    SELECT *
+    SELECT Account, FORMAT(Current_Year, 2) AS Current_Year, FORMAT(Past_Year, 2) AS Past_Year, Percentage_Change
     FROM final_PL_statements;
 END $$
 
@@ -237,9 +231,14 @@ BEGIN
     INSERT INTO final_BS_statements
     VALUES ('TOTAL LIABILITIES AND EQUITY', ROUND(total_liabilities_equity_cy, 2),
             ROUND(total_liabilities_equity_py, 2), @percentage_change);
-    SELECT Account, FORMAT(Current_Year, 2), FORMAT(Past_Year, 2), Percentage_Change
+    SELECT Account, FORMAT(Current_Year, 2) AS Current_Year, FORMAT(Past_Year, 2) AS Past_Year, Percentage_Change
     FROM final_BS_statements;
 END $$
+
+
+
+
+
 
 
 CALL LL_BS_Statement(2015);
